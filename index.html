@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#243447">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Karteikarten Pro</title>
+<style>
+*{box-sizing:border-box}
+:root{--bg:#f4f5f7;--card:#fff;--text:#222;--muted:#68717c;--primary:#243447;--success:#2e8b57;--danger:#c94c4c;--border:#d9dde2}
+body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--text)}
+header{background:var(--primary);color:#fff;padding:18px;text-align:center}
+.container{max-width:900px;margin:24px auto;padding:16px}
+button{border:0;border-radius:10px;padding:11px 16px;cursor:pointer;font-size:15px}
+button:disabled{opacity:.5;cursor:not-allowed}
+.primary{background:var(--primary);color:#fff}.secondary{background:#e1e4e8}.danger{background:var(--danger);color:#fff}.success{background:var(--success);color:#fff}.warning{background:#d28b24;color:#fff}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.panel,.deck,.subdeck,.card-row{background:var(--card);border-radius:15px;padding:18px;box-shadow:0 2px 8px #00000010;margin:12px 0}
+.deck,.subdeck,.card-row{display:flex;justify-content:space-between;align-items:center;gap:15px}
+.subdeck{margin-left:25px;border-left:5px solid #9aa7b4}
+.deck-buttons{display:flex;gap:7px;flex-wrap:wrap}
+h2,h3{margin-top:0}.muted{color:var(--muted);font-size:14px}
+.hidden{display:none!important}
+input,textarea,select{width:100%;padding:12px;margin:7px 0 14px;border:1px solid var(--border);border-radius:9px;font-size:16px;background:#fff}
+textarea{min-height:100px;resize:vertical}
+label{font-weight:bold;font-size:14px}
+.form{background:#fff;padding:20px;border-radius:15px;margin:15px 0}
+.mode{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 15px}
+.mode label{font-weight:normal;border:1px solid var(--border);padding:10px;border-radius:9px;cursor:pointer}
+.image-preview{max-width:180px;max-height:150px;display:block;border-radius:10px;margin:8px 0}
+.progress{text-align:center;color:var(--muted);margin:12px}
+.learning-card{background:#fff;min-height:390px;border-radius:20px;box-shadow:0 4px 18px #00000015;padding:35px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:30px;font-weight:500;line-height:1.4;cursor:pointer;margin:15px 0}.learning-card>div{max-width:90%;width:100%}
+.learning-card img{max-width:100%;max-height:180px;border-radius:12px;margin:12px auto;display:block}
+.answer-buttons{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
+.stats{display:flex;gap:10px;flex-wrap:wrap}.stat{background:#eef0f3;padding:8px 12px;border-radius:8px;font-size:13px}.due{background:#fff3cd;border:1px solid #ffe08a}.due strong{font-size:18px}.anki-buttons{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}.anki-buttons button{min-height:62px}.anki-buttons small{display:block;margin-top:4px;opacity:.85}.question-answer{display:flex;flex-direction:column;gap:18px}.qa-label{font-size:13px;color:#68717c;font-weight:bold;text-transform:uppercase}.answer-box{border-top:1px solid #ddd;padding-top:18px}@media(max-width:600px){.anki-buttons{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.container{margin:8px auto}.deck,.subdeck,.card-row{flex-direction:column;align-items:flex-start}.deck-buttons{width:100%}.learning-card{min-height:300px;padding:25px;font-size:22px}}
+</style>
+</head>
+<body>
+<header><h1>📚 Karteikarten Pro</h1></header>
+<div class="container">
+
+<section id="deckView">
+<div class="toolbar">
+<button class="primary" onclick="showNewDeckForm()">+ Hauptstapel</button>
+<button class="secondary" onclick="showImportForm()">📥 Import</button>
+<button class="secondary" onclick="exportData()">📤 Export</button>
+</div>
+<div id="deckList"></div>
+
+<div id="newDeckForm" class="form hidden">
+<h3>Neuer Hauptstapel</h3>
+<input id="deckName" placeholder="z. B. Notfallmedizin">
+<button class="primary" onclick="createDeck()">Erstellen</button>
+<button class="secondary" onclick="hideNewDeckForm()">Abbrechen</button>
+</div>
+
+<div id="importForm" class="form hidden">
+<h3>Daten importieren</h3>
+<textarea id="importText" placeholder="Hier einen zuvor exportierten JSON-Text einfügen"></textarea>
+<button class="primary" onclick="importData()">Importieren</button>
+<button class="secondary" onclick="hideImportForm()">Abbrechen</button>
+</div>
+</section>
+
+<section id="cardsView" class="hidden">
+<button class="secondary" onclick="showDecks()">← Stapel</button>
+<h2 id="currentDeckName"></h2>
+<div id="deckStats" class="stats"></div>
+<div class="toolbar">
+<button class="primary" onclick="showNewSubdeckForm()">+ Unterstapel</button>
+<button class="primary" onclick="showNewCardForm()">+ Karteikarte</button>
+<button class="success" onclick="startLearning()">▶ Lernen</button>
+</div>
+
+<div id="newSubdeckForm" class="form hidden">
+<h3>Neuer Unterstapel</h3>
+<input id="subdeckName" placeholder="z. B. Atemweg">
+<button class="primary" onclick="createSubdeck()">Erstellen</button>
+<button class="secondary" onclick="hideNewSubdeckForm()">Abbrechen</button>
+</div>
+
+<div id="newCardForm" class="form hidden">
+<h3>Neue Karteikarte</h3>
+<label>Vorderseite</label>
+<textarea id="question" placeholder="Frage / Begriff"></textarea>
+<label>Foto auf der Vorderseite (optional)</label>
+<input id="questionImage" type="file" accept="image/*" onchange="previewImage(this,'questionPreview')">
+<img id="questionPreview" class="image-preview hidden">
+
+<label>Rückseite</label>
+<textarea id="answer" placeholder="Antwort / Erklärung"></textarea>
+<label>Foto auf der Rückseite (optional)</label>
+<input id="answerImage" type="file" accept="image/*" onchange="previewImage(this,'answerPreview')">
+<img id="answerPreview" class="image-preview hidden">
+
+<label>Abfrage-Richtung</label>
+<div class="mode">
+<label><input type="radio" name="direction" value="forward" checked> Einfach: Vorderseite → Rückseite</label>
+<label><input type="radio" name="direction" value="both"> Beide Richtungen</label>
+</div>
+
+<button class="primary" onclick="createCard()">Speichern</button>
+<button class="secondary" onclick="hideNewCardForm()">Abbrechen</button>
+</div>
+
+<div id="cardList"></div>
+</section>
+
+<section id="learningView" class="hidden">
+<button class="secondary" onclick="showCards()">← Lernen beenden</button>
+<div class="progress" id="progress"></div>
+<div class="learning-card" id="learningCard" onclick="flipCard()"></div>
+<div id="answerButtons" class="anki-buttons hidden">
+<button class="danger" onclick="rateCard(0)">Nochmal<small>10 Min.</small></button>
+<button class="warning" onclick="rateCard(1)">Schwer<small id="hardInterval">–</small></button>
+<button class="success" onclick="rateCard(2)">Gut<small id="goodInterval">–</small></button>
+<button class="primary" onclick="rateCard(3)">Einfach<small id="easyInterval">–</small></button>
+</div>
+</section>
+</div>
+
+<script>
+let decks=JSON.parse(localStorage.getItem("decksPro")||"[]");
+let currentDeckPath=null,currentCardIndex=0,learningCards=[],showingAnswer=false;
+
+function save(){localStorage.setItem("decksPro",JSON.stringify(decks))}
+function id(){return Date.now().toString(36)+Math.random().toString(36).slice(2)}
+function escapeHTML(t){let d=document.createElement("div");d.textContent=t||"";return d.innerHTML}
+function getDeck(path){let d=decks[path[0]];for(let i=1;i<path.length;i++)d=d.subdecks[path[i]];return d}
+function allCards(deck){let cards=[...deck.cards];(deck.subdecks||[]).forEach(s=>cards.push(...allCards(s)));return cards}
+
+function renderDecks(){
+ const list=document.getElementById("deckList");list.innerHTML="";
+ if(!decks.length){list.innerHTML="<p>Noch keine Lernstapel vorhanden.</p>";return}
+ decks.forEach((d,i)=>{
+  const count=allCards(d).length;
+  const div=document.createElement("div");div.className="deck";
+  div.innerHTML=`<div><h3>📚 ${escapeHTML(d.name)}</h3><span class="muted">${count} Karten insgesamt</span></div>
+  <div class="deck-buttons"><button class="primary" onclick="openDeck([${i}])">Öffnen</button>
+  <button class="danger" onclick="deleteDeck([${i}])">Löschen</button></div>`;
+  list.appendChild(div);
+ });
+}
+function showNewDeckForm(){document.getElementById("newDeckForm").classList.remove("hidden")}
+function hideNewDeckForm(){document.getElementById("newDeckForm").classList.add("hidden")}
+function createDeck(){let n=document.getElementById("deckName").value.trim();if(!n)return alert("Bitte einen Namen eingeben.");decks.push({name:n,cards:[],subdecks:[]});save();document.getElementById("deckName").value="";hideNewDeckForm();renderDecks()}
+function deleteDeck(path){if(!confirm("Diesen Stapel und alle Unterstapel löschen?"))return;decks.splice(path[0],1);save();renderDecks()}
+function showImportForm(){document.getElementById("importForm").classList.remove("hidden")}
+function hideImportForm(){document.getElementById("importForm").classList.add("hidden")}
+function exportData(){navigator.clipboard?.writeText(JSON.stringify(decks));alert("Daten wurden als JSON in die Zwischenablage kopiert.")}
+function importData(){try{let x=JSON.parse(document.getElementById("importText").value);if(!Array.isArray(x))throw 0;decks=x;save();hideImportForm();renderDecks();alert("Import erfolgreich.")}catch(e){alert("Ungültige Daten.")}}
+
+function openDeck(path){
+ currentDeckPath=path;
+ document.getElementById("deckView").classList.add("hidden");
+ document.getElementById("cardsView").classList.remove("hidden");
+ renderCards();
+}
+function showDecks(){document.getElementById("cardsView").classList.add("hidden");document.getElementById("deckView").classList.remove("hidden");renderDecks()}
+function showCards(){document.getElementById("learningView").classList.add("hidden");document.getElementById("cardsView").classList.remove("hidden");renderCards()}
+
+function renderCards(){
+ const d=getDeck(currentDeckPath);
+ document.getElementById("currentDeckName").textContent=d.name;
+ const cards=d.cards.length, all=allCards(d), total=all.length, now=Date.now(), due=all.filter(c=>!c.due||c.due<=now).length;
+ document.getElementById("deckStats").innerHTML=`<span class="stat">${cards} Karten in diesem Stapel</span><span class="stat">${total} inkl. Unterstapel</span><span class="stat due">🟡 <strong>${due}</strong> fällig</span>`;
+ const list=document.getElementById("cardList");list.innerHTML="";
+ (d.subdecks||[]).forEach((s,i)=>{
+  const div=document.createElement("div");div.className="subdeck";
+  div.innerHTML=`<div><h3>📁 ${escapeHTML(s.name)}</h3><span class="muted">${allCards(s).length} Karten</span></div>
+  <div class="deck-buttons"><button class="primary" onclick="openDeck(${JSON.stringify([...currentDeckPath,i])})">Öffnen</button>
+  <button class="danger" onclick="deleteSubdeck(${i})">Löschen</button></div>`;
+  list.appendChild(div);
+ });
+ d.cards.forEach((c,i)=>{
+  const div=document.createElement("div");div.className="card-row";
+  const dir=c.direction==="both"?"↔ Beide Richtungen":"→ Einfach";
+  div.innerHTML=`<div><strong>${escapeHTML(c.question)}</strong><br><span class="muted">${dir} · ${c.repetitions||0} Wiederholungen</span></div>
+  <button class="danger" onclick="deleteCard(${i})">Löschen</button>`;
+  list.appendChild(div);
+ });
+}
+function showNewSubdeckForm(){document.getElementById("newSubdeckForm").classList.remove("hidden")}
+function hideNewSubdeckForm(){document.getElementById("newSubdeckForm").classList.add("hidden")}
+function createSubdeck(){let n=document.getElementById("subdeckName").value.trim();if(!n)return alert("Bitte einen Namen eingeben.");getDeck(currentDeckPath).subdecks.push({name:n,cards:[],subdecks:[]});save();document.getElementById("subdeckName").value="";hideNewSubdeckForm();renderCards()}
+function deleteSubdeck(i){if(!confirm("Unterstapel und Karten darin löschen?"))return;getDeck(currentDeckPath).subdecks.splice(i,1);save();renderCards()}
+function showNewCardForm(){document.getElementById("newCardForm").classList.remove("hidden")}
+function hideNewCardForm(){document.getElementById("newCardForm").classList.add("hidden")}
+function previewImage(input,target){let f=input.files[0];if(!f)return;let r=new FileReader();r.onload=e=>{let im=document.getElementById(target);im.src=e.target.result;im.classList.remove("hidden")};r.readAsDataURL(f)}
+function imageToDataURL(input){return new Promise(resolve=>{let f=input.files[0];if(!f)return resolve("");let r=new FileReader();r.onload=e=>resolve(e.target.result);r.readAsDataURL(f)})}
+
+async function createCard(){
+ let q=document.getElementById("question").value.trim(),a=document.getElementById("answer").value.trim();
+ if(!q&&!document.getElementById("questionImage").files.length)return alert("Bitte eine Vorderseite eingeben oder ein Foto hinzufügen.");
+ if(!a&&!document.getElementById("answerImage").files.length)return alert("Bitte eine Rückseite eingeben oder ein Foto hinzufügen.");
+ let qi=await imageToDataURL(document.getElementById("questionImage")),ai=await imageToDataURL(document.getElementById("answerImage"));
+ let direction=document.querySelector('input[name="direction"]:checked').value;
+ getDeck(currentDeckPath).cards.push({id:id(),question:q,answer:a,questionImage:qi,answerImage:ai,direction,correct:0,incorrect:0,repetitions:0,interval:0,ease:2.5,due:Date.now()});
+ save();clearCardForm();hideNewCardForm();renderCards()
+}
+function clearCardForm(){["question","answer","questionImage","answerImage"].forEach(x=>document.getElementById(x).value="");["questionPreview","answerPreview"].forEach(x=>document.getElementById(x).classList.add("hidden"))}
+function deleteCard(i){if(!confirm("Karte löschen?"))return;getDeck(currentDeckPath).cards.splice(i,1);save();renderCards()}
+
+function startLearning(){
+ let d=getDeck(currentDeckPath),cards=allCards(d),now=Date.now();
+ cards=cards.filter(c=>!c.due||c.due<=now);
+ if(!cards.length)return alert("Keine Karten sind momentan fällig. Du bist auf dem aktuellen Stand! 🎉");
+ learningCards=[];
+ cards.forEach(c=>{
+  learningCards.push({card:c,reverse:false});
+  if(c.direction==="both")learningCards.push({card:c,reverse:true});
+ });
+ learningCards.sort(()=>Math.random()-.5);
+ currentCardIndex=0;
+ document.getElementById("cardsView").classList.add("hidden");
+ document.getElementById("learningView").classList.remove("hidden");
+ showLearningCard();
+}
+
+function cardSide(item){return item.reverse?item.card.answer:item.card.question}
+function imageSide(item){return item.reverse?item.card.answerImage:item.card.questionImage}
+function answerText(item){return item.reverse?item.card.question:item.card.answer}
+function answerImage(item){return item.reverse?item.card.questionImage:item.card.answerImage}
+
+function formatInterval(days){
+ if(days<1)return Math.max(1,Math.round(days*24*60))+" Min.";
+ if(days<2)return "1 Tag";
+ if(days<30)return Math.round(days)+" Tage";
+ if(days<365)return Math.round(days/30)+" Mon.";
+ return (days/365).toFixed(1)+" J.";
+}
+
+function calculateIntervals(c){
+ let ease=c.ease||2.5, old=c.interval||0;
+ let hard=Math.max(1,old?old*1.2:1);
+ let good=old<=0?1:old<1?1:old<3?3:old*ease;
+ let easy=old<=0?4:good*1.3;
+ return {hard,good,easy};
+}
+
+function showLearningCard(){
+ if(currentCardIndex>=learningCards.length){finishLearning();return}
+ showingAnswer=false;
+ let item=learningCards[currentCardIndex],text=cardSide(item),img=imageSide(item);
+ document.getElementById("progress").textContent=`${currentCardIndex+1} / ${learningCards.length}${item.reverse?" · ↔ umgekehrt":""}`;
+ document.getElementById("learningCard").innerHTML=
+ `<div>${escapeHTML(text)}${img?`<img src="${img}">`:""}</div>`;
+ document.getElementById("answerButtons").classList.add("hidden");
+}
+
+function flipCard(){
+ if(showingAnswer)return;
+ showingAnswer=true;
+ let item=learningCards[currentCardIndex],question=cardSide(item),qimg=imageSide(item),answer=answerText(item),aimg=answerImage(item);
+ let intervals=calculateIntervals(item.card);
+ document.getElementById("learningCard").innerHTML=
+ `<div class="question-answer">
+   <div><div class="qa-label">Frage</div>${escapeHTML(question)}${qimg?`<img src="${qimg}">`:""}</div>
+   <div class="answer-box"><div class="qa-label">Antwort</div>${escapeHTML(answer)}${aimg?`<img src="${aimg}">`:""}</div>
+ </div>`;
+ document.getElementById("hardInterval").textContent=formatInterval(intervals.hard);
+ document.getElementById("goodInterval").textContent=formatInterval(intervals.good);
+ document.getElementById("easyInterval").textContent=formatInterval(intervals.easy);
+ document.getElementById("answerButtons").classList.remove("hidden");
+}
+
+function locateCard(root,idv){
+ if(root.cards){let c=root.cards.find(x=>x.id===idv);if(c)return c}
+ for(let s of root.subdecks||[]){let c=locateCard(s,idv);if(c)return c}
+ return null
+}
+
+/* Anki-ähnliche Bewertung:
+   0 Nochmal: 10 Minuten
+   1 Schwer: kleines Intervall
+   2 Gut: normales Intervall
+   3 Einfach: deutlich längeres Intervall */
+function rateCard(rating){
+ let item=learningCards[currentCardIndex];
+ let c=locateCard(decks[currentDeckPath[0]],item.card.id);
+ if(!c){currentCardIndex++;showLearningCard();return}
+
+ c.correct=c.correct||0;c.incorrect=c.incorrect||0;c.repetitions=c.repetitions||0;
+ c.interval=c.interval||0;c.ease=c.ease||2.5;
+
+ if(rating===0){
+   c.incorrect++;c.repetitions=0;c.interval=0;c.due=Date.now()+10*60000;
+   c.ease=Math.max(1.3,c.ease-0.2);
+ }else if(rating===1){
+   c.correct++;c.repetitions++;
+   c.interval=Math.max(1,c.interval?c.interval*1.2:1);
+   c.ease=Math.max(1.3,c.ease-0.15);
+   c.due=Date.now()+c.interval*86400000;
+ }else if(rating===2){
+   c.correct++;c.repetitions++;
+   c.interval=c.interval<=0?1:c.interval<1?1:c.interval<3?3:c.interval*c.ease;
+   c.due=Date.now()+c.interval*86400000;
+ }else{
+   c.correct++;c.repetitions++;
+   let base=c.interval<=0?4:c.interval<1?1:c.interval<3?3:c.interval*c.ease;
+   c.interval=base*1.3;
+   c.ease=Math.min(3.0,c.ease+0.15);
+   c.due=Date.now()+c.interval*86400000;
+ }
+ save();
+ currentCardIndex++;
+ showLearningCard();
+}
+
+function finishLearning(){
+ document.getElementById("learningCard").innerHTML="<div>🎉<br><br>Lernen abgeschlossen!<br><br>Die nächsten Karten werden automatisch anhand deiner Antworten geplant.</div>";
+ document.getElementById("answerButtons").classList.add("hidden");
+}
+renderDecks();
+</script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
